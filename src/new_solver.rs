@@ -1,69 +1,225 @@
 use std::time::Instant;
 
 use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
-    evaluate::{evaluate, new_evaluate}, freq_list::FreqList, heuristic_evaluate::heuristic_evaluate, node::Node,
-    node_iterator::NodeIterator, util::{set32_to_string, set32s_to_string},
+    evaluate::new_evaluate,
+    freq_list::{create_freq_list, FreqList},
+    globals::NUM_LETTERS,
+    heuristic_evaluate::heuristic_evaluate,
+    node::Node,
+    node_iterator::NodeIterator,
+    scorecast::{self, Scorecast},
+    util::set32s_to_string,
 };
 
-pub fn new_solver1(
+pub fn solver(threshold: f32, desired_num_keys: usize, max_key_len: usize) {
+    let mut iter = NodeIterator::create_empty();
+    let freq_list = create_freq_list("./word_freq.json");
+    let mut scorecast = Scorecast::default();
+    for i in 0..desired_num_keys {
+        println!("Starting layer {}", i);
+        solver_layer(
+            &mut iter,
+            i,
+            &mut scorecast,
+            threshold,
+            &freq_list,
+            desired_num_keys,
+            NUM_LETTERS,
+            max_key_len,
+        );
+        println!("Finished layer {}, creating scorecast score", i);
+        let start = Instant::now();
+        scorecast.setup_scorecast_tree(&iter);
+        println!("Scorecast tree created in {:?}", start.elapsed());
+    }
+}
+
+pub fn solver_layer(
     iter: &mut NodeIterator,
     target_layer: usize,
+    scorecast: &mut Scorecast,
     threshold: f32,
     freq_list: &FreqList,
-    num_keys: usize,
-    num_letters: usize,
+    desired_num_keys: usize,
+    desired_num_letters: usize,
     max_key_len: usize,
 ) {
     if iter.path.len() == target_layer {
         let children_to_evaluate =
-            iter.new_get_children_to_evaluate(num_keys, num_letters, max_key_len);
+            iter.new_get_children_to_evaluate(desired_num_keys, desired_num_letters, max_key_len);
         if children_to_evaluate.is_none() {
             return;
         }
+        // children_to_evaluate
+        //     .clone()
+        //     .unwrap()
+        //     .par_iter()
+        //     .for_each(|child| {
+        //         let mut new_path = iter.path.clone();
+        //         new_path.push(*child);
+        //         println!("Evaluating {}", set32s_to_string(&new_path));
+        //         let mut add = None;
+        //         let mut heuristic_score = 0.0;
+        //         let mut should_evaluate_real = true;
+        //         if target_layer != 0 {
+        //             let start: Instant = Instant::now();
+        //             let heuristic_evaluate = heuristic_evaluate(iter, &new_path);
+        //             println!("\tHeuristic duration: {:?}", start.elapsed());
+        //             if heuristic_evaluate.is_none() {
+        //                 println!("\tHeuristic failed.");
+        //                 should_evaluate_real = false;
+        //             }
+        //             heuristic_score = heuristic_evaluate.unwrap();
+        //             let mut under_threshold: bool = heuristic_score <= threshold;
+        //             let num_letters_used: usize =
+        //                 new_path.iter().map(|key| key.ones_indices().len()).sum();
+        //             let start: Instant = Instant::now();
+        //             add = scorecast.get_add_amount(
+        //                 desired_num_keys - target_layer,
+        //                 desired_num_letters - num_letters_used,
+        //             );
+        //             println!("\tGetting add_amount took {:?}", start.elapsed());
+        //             if add.is_none() {
+        //                 println!(
+        //                 "\tScorecasting predicted failure for {}. This probably shouldn't happen",
+        //                 set32s_to_string(&new_path)
+        //             );
+        //             } else {
+        //                 println!(
+        //                     "Heuristic w/o scorecasting: {}, w/ scorecasting {}",
+        //                     heuristic_score,
+        //                     heuristic_score + add.unwrap()
+        //                 );
+        //                 heuristic_score += add.unwrap();
+        //                 under_threshold = heuristic_score <= threshold;
+        //             }
+        //             println!("\tHeuristic score under threshold: {}", under_threshold);
+        //             if !under_threshold {
+        //                 println!("\tPruning!");
+        //                 should_evaluate_real = false;
+        //             }
+        //         }
+        //         if should_evaluate_real {
+        //             let start: Instant = Instant::now();
+        //             let real_score = new_evaluate(&freq_list, &new_path, threshold).0;
+        //             println!("\tReal evaluate duration: {:?}", start.elapsed());
+        //             if iter.path.len() == max_key_len && real_score <= threshold {
+        //                 println!("\tSolution found: {}", set32s_to_string(&iter.path));
+        //                 panic!(
+        //                     "\tReal score: {}",
+        //                     new_evaluate(&freq_list, &new_path, threshold).0
+        //                 );
+        //             }
+
+        //             let real_score_with_scorecast = real_score + add.unwrap_or(0.0);
+        //             let under_threshold = real_score_with_scorecast <= threshold;
+        //             println!(
+        //                 "\tReal score w/o scorecast: {}, with scorecast {}, under threshold: {}",
+        //                 real_score, real_score_with_scorecast, under_threshold
+        //             );
+        //             println!(
+        //                 "\tHeuristic percentage error: %{}",
+        //                 100.0 * (heuristic_score - real_score).abs()
+        //                     / ((heuristic_score + real_score) / 2.0)
+        //             );
+
+        //             if under_threshold {
+        //                 let node = Node::new(real_score, *child, vec![]);
+        //                 iter.insert_node_from_here(node);
+        //             } else {
+        //                 println!("\tPruning!");
+        //             }
+        //         }
+        //     });
         for child in children_to_evaluate.unwrap() {
             let mut new_path = iter.path.clone();
             new_path.push(child);
             println!("Evaluating {}", set32s_to_string(&new_path));
-            let start: Instant = Instant::now();
-            let heuristic_evaluate = heuristic_evaluate(iter, &new_path);
-            println!("\tHeuristic duration: {:?}", start.elapsed());
-            if heuristic_evaluate.is_none() {
-                println!("\tHeuristic failed.");
-                continue;
+            let mut add = None;
+            let mut heuristic_score = 0.0;
+            if target_layer != 0 {
+                let start: Instant = Instant::now();
+                let heuristic_evaluate = heuristic_evaluate(iter, &new_path);
+                println!("\tHeuristic duration: {:?}", start.elapsed());
+                if heuristic_evaluate.is_none() {
+                    println!("\tHeuristic failed.");
+                    continue;
+                }
+                heuristic_score = heuristic_evaluate.unwrap();
+                let mut under_threshold: bool = heuristic_score <= threshold;
+                let num_letters_used: usize =
+                    new_path.iter().map(|key| key.ones_indices().len()).sum();
+                let start: Instant = Instant::now();
+                add = scorecast.get_add_amount(
+                    desired_num_keys - target_layer,
+                    desired_num_letters - num_letters_used,
+                );
+                println!("\tGetting add_amount took {:?}", start.elapsed());
+                if add.is_none() {
+                    println!(
+                        "\tScorecasting predicted failure for {}. This probably shouldn't happen",
+                        set32s_to_string(&new_path)
+                    );
+                } else {
+                    println!(
+                        "Heuristic w/o scorecasting: {}, w/ scorecasting {}",
+                        heuristic_score,
+                        heuristic_score + add.unwrap()
+                    );
+                    heuristic_score += add.unwrap();
+                    under_threshold = heuristic_score <= threshold;
+                }
+                println!("\tHeuristic score under threshold: {}", under_threshold);
+                if !under_threshold {
+                    println!("\tPruning!");
+                    continue;
+                }
             }
-            let heuristic_score = heuristic_evaluate.unwrap();
-            let under_threshold = heuristic_score <= threshold;
-            println!(
-                "\tHeuristic score {}, under threshold: {}",
-                heuristic_score, under_threshold
-            );
             let start: Instant = Instant::now();
-            let (real_score,_) = new_evaluate(&freq_list, &new_path, threshold);
+            let real_score = new_evaluate(&freq_list, &new_path, threshold).0;
             println!("\tReal evaluate duration: {:?}", start.elapsed());
-            let under_threshold = real_score <= threshold;
+            if iter.path.len() == max_key_len && real_score <= threshold {
+                println!("\tSolution found: {}", set32s_to_string(&iter.path));
+                panic!(
+                    "\tReal score: {}",
+                    new_evaluate(&freq_list, &new_path, threshold).0
+                );
+            }
+
+            let real_score_with_scorecast = real_score + add.unwrap_or(0.0);
+            let under_threshold = real_score_with_scorecast <= threshold;
             println!(
-                "\tReal score {}, under threshold: {}",
-                real_score, under_threshold
+                "\tReal score w/o scorecast: {}, with scorecast {}, under threshold: {}",
+                real_score, real_score_with_scorecast, under_threshold
             );
-            println!("\tHeuristic percentage error: %{}", 100.0*( heuristic_score - real_score).abs() /((heuristic_score+real_score)/2.0));
+            println!(
+                "\tHeuristic percentage error: %{}",
+                100.0 * (heuristic_score - real_score).abs()
+                    / ((heuristic_score + real_score) / 2.0)
+            );
+
             if under_threshold {
                 let node = Node::new(real_score, child, vec![]);
                 iter.insert_node_from_here(node);
+            } else {
+                println!("\tPruning!");
             }
         }
     } else {
         for child in &iter.current_node.borrow().children {
             let mut new_path = iter.path.clone();
             new_path.push(child.as_ref().borrow().letters);
-            new_solver1(
+            solver_layer(
                 &mut iter.node_to_iter(child.clone(), &new_path),
                 target_layer,
+                scorecast,
                 threshold,
                 &freq_list,
-                num_keys,
-                num_letters,
+                desired_num_keys,
+                desired_num_letters,
                 max_key_len,
             );
         }
@@ -71,19 +227,12 @@ pub fn new_solver1(
 }
 #[cfg(test)]
 mod tests {
-    use crate::{
-        freq_list::{self, create_freq_list},
-        globals::NUM_LETTERS,
-        node_iterator::NodeIterator,
-    };
-
-    use super::new_solver1;
 
     #[test]
     fn new_solver_new_solver() {
-        let mut iter = NodeIterator::create_empty();
-        let freq_list = create_freq_list("./word_freq.json");
-        new_solver1(&mut iter, 0, 0.1, &freq_list, 10, NUM_LETTERS, 2);
+        // let mut iter = NodeIterator::create_empty();
+        // let freq_list = create_freq_list("./word_freq.json");
+        // new_solver1(&mut iter, 0, 0.1, &freq_list, 10, NUM_LETTERS, 2);
         // new_solver(&mut iter, 1, 0.1, &freq_list, 10, NUM_LETTERS, 2);
     }
 }

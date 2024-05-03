@@ -21,7 +21,7 @@ pub fn heuristic_evaluate(iter: &NodeIterator, path: &Vec<Set32>) -> Option<f32>
     let mut score = 0.0;
     for path_group in paths {
         for path in path_group {
-            let node = iter.find_node(&path);
+            let node = iter.find_node_from_root(&path);
             if node.is_none() {
                 return None;
             }

@@ -32,6 +32,7 @@ pub trait ChildrenContainer {
     fn children(&self) -> &Vec<Rc<RefCell<Node>>>;
 }
 
+#[derive(Clone)]
 pub struct Node {
     pub score: f32,
     pub letters: Set32,
