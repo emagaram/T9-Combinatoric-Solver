@@ -1,19 +1,19 @@
-use std::{cell::RefCell, cmp::Ordering, rc::Rc};
+use std::{borrow::Borrow, cell::RefCell, cmp::Ordering, rc::Rc, sync::{Arc, RwLock}};
 
 use itertools::Itertools;
 
 use crate::{node::Node, set32::Set32, util::compare_letters};
 
 pub struct NodeIterator {
-    pub root: Rc<RefCell<Node>>,
-    pub current_node: Rc<RefCell<Node>>,
+    pub root: Arc<RwLock<Node>>,
+    pub current_node: Arc<RwLock<Node>>,
     pub path: Vec<Set32>,
 }
 
 
 impl NodeIterator {
     pub fn create_empty() -> NodeIterator {
-        let root = Rc::new(RefCell::new(Node::new(0.0, Set32::EMPTY, vec![])));
+        let root = Arc::new(RwLock::new(Node::new(0.0, Set32::EMPTY, vec![])));
         NodeIterator {
             current_node: root.clone(),
             path: vec![],
@@ -21,8 +21,8 @@ impl NodeIterator {
         }
     }    
     pub fn new(
-        root: Rc<RefCell<Node>>,
-        current_node: Rc<RefCell<Node>>,
+        root: Arc<RwLock<Node>>,
+        current_node: Arc<RwLock<Node>>,
         path: Vec<Set32>,
     ) -> Self {
         NodeIterator {
@@ -59,12 +59,12 @@ impl NodeIterator {
     }
     pub fn insert_node_from_here(&mut self, node: Node) {
         self.current_node
-            .borrow_mut()
+            .read()
             .children
-            .push(Rc::new(RefCell::new(node)));
+            .push(Rc::new(RwLock::new(node)));
     }    
     pub fn insert_node_from_root(&mut self, path: &[Set32], node: Node) {
-        let mut current_node: Rc<RefCell<Node>> = self.root.clone();
+        let mut current_node: Arc<RwLock<Node>> = self.root.clone();
         for key in path.iter() {
             let node_idx = current_node
                 .borrow_mut()
@@ -87,7 +87,7 @@ impl NodeIterator {
         current_node
             .borrow_mut()
             .children
-            .push(Rc::new(RefCell::new(node)));
+            .push(Rc::new(RwLock::new(node)));
     }
 
     pub fn calculate_predecessors_from_path(path: &[Set32]) -> Vec<Vec<Set32>> {
@@ -139,7 +139,7 @@ impl NodeIterator {
 
         result
     }
-    pub fn node_to_iter(&self, node: Rc<RefCell<Node>>, path:&[Set32]) -> NodeIterator {
+    pub fn node_to_iter(&self, node: Arc<RwLock<Node>>, path:&[Set32]) -> NodeIterator {
         NodeIterator {
             root: self.root.clone(),
             current_node: node.clone(),
@@ -160,12 +160,12 @@ impl NodeIterator {
         }
         Some(self.node_to_iter(node.unwrap(), path))
     }    
-    pub fn find_node_from_node(node:Rc<RefCell<Node>>, path: &[Set32]) -> Option<Rc<RefCell<Node>>> {
+    pub fn find_node_from_node(node:Arc<RwLock<Node>>, path: &[Set32]) -> Option<Arc<RwLock<Node>>> {
         if path.is_empty() {
             return Some(node.clone());
         }
 
-        let mut current: Rc<RefCell<Node>> = node.clone();
+        let mut current: Arc<RwLock<Node>> = node.clone();
         for key in path {
             let search = &current
                 .as_ref()
@@ -182,10 +182,10 @@ impl NodeIterator {
         }
         Some(current)
     }        
-    pub fn find_node_from_root(&self, path: &[Set32]) -> Option<Rc<RefCell<Node>>> {
+    pub fn find_node_from_root(&self, path: &[Set32]) -> Option<Arc<RwLock<Node>>> {
         Self::find_node_from_node(self.root.clone(), path)
     }
-    pub fn find_node_from_here(&self, path: &[Set32]) -> Option<Rc<RefCell<Node>>> {
+    pub fn find_node_from_here(&self, path: &[Set32]) -> Option<Arc<RwLock<Node>>> {
         Self::find_node_from_node(self.current_node.clone(), path)
     }    
     fn get_end_idx(keys: &[Set32], target: Set32) -> usize {
@@ -359,7 +359,7 @@ mod tests {
     use super::NodeIterator;
 
     fn create_empty_node_iterator() -> NodeIterator {
-        let root = Rc::new(RefCell::new(Node::new(0.0, Set32::EMPTY, vec![])));
+        let root = Rc::new(RwLock::new(Node::new(0.0, Set32::EMPTY, vec![])));
         NodeIterator {
             current_node: root.clone(),
             path: vec![],
@@ -407,7 +407,7 @@ mod tests {
             .as_ref()
             .borrow_mut()
             .children
-            .push(Rc::new(RefCell::new(a)));
+            .push(Rc::new(RwLock::new(a)));
         let found_node = iter.find_node_from_root(&path);
         assert!(found_node.is_some());
         assert_eq!(found_node.unwrap().as_ref().borrow().score, 2.0);
@@ -421,7 +421,7 @@ mod tests {
             .as_ref()
             .borrow_mut()
             .children
-            .push(Rc::new(RefCell::new(b)));
+            .push(Rc::new(RwLock::new(b)));
         let path = vec![create_set32_str!("a"), create_set32_str!("b")];
         assert!(iter.find_node_from_root(&path).is_some());
         assert_eq!(iter.find_node_from_root(&path).unwrap().as_ref().borrow().score, 2.1);
@@ -433,17 +433,17 @@ mod tests {
         ];
         assert!(iter.find_node_from_root(&path).is_none());
 
-        let yz = Rc::new(RefCell::new(Node::new(
+        let yz = Rc::new(RwLock::new(Node::new(
             1.3,
             create_set32_str!("yz"),
             vec![],
         )));
-        let ef = Rc::new(RefCell::new(Node::new(
+        let ef = Rc::new(RwLock::new(Node::new(
             1.01,
             create_set32_str!("ef"),
             vec![],
         )));
-        let ab = Rc::new(RefCell::new(Node::new(
+        let ab = Rc::new(RwLock::new(Node::new(
             1.01,
             create_set32_str!("ab"),
             vec![],
