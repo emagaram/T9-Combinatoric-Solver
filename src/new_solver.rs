@@ -169,8 +169,7 @@ pub fn solver_layer(
                         heuristic_score,
                         heuristic_score + add.unwrap()
                     );
-                    heuristic_score += add.unwrap();
-                    under_threshold = heuristic_score <= threshold;
+                    under_threshold = heuristic_score + add.unwrap() <= threshold;
                 }
                 println!("\tHeuristic score under threshold: {}", under_threshold);
                 if !under_threshold {
