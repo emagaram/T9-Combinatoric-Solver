@@ -21,5 +21,5 @@ pub mod freq_list;
 
 
 fn main() {
-    solver(0.248, 10, 4);
+    solver(0.248, 10, 3);
 }
