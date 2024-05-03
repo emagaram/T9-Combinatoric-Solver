@@ -165,7 +165,7 @@ pub fn solver_layer(
                     );
                 } else {
                     println!(
-                        "Heuristic w/o scorecasting: {}, w/ scorecasting {}",
+                        "\tHeuristic w/o scorecasting: {}, w/ scorecasting {}",
                         heuristic_score,
                         heuristic_score + add.unwrap()
                     );
