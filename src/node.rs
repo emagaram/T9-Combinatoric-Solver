@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::{Arc, RwLock}};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 /*
 
@@ -24,6 +24,8 @@ So we find all parents and intersect
 
 */
 
+
+use parking_lot::RwLock;
 
 use crate::set32::Set32;
 

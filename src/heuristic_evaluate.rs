@@ -25,7 +25,7 @@ pub fn heuristic_evaluate(iter: &NodeIterator, path: &Vec<Set32>) -> Option<f32>
             if node.is_none() {
                 return None;
             }
-            let add = node.unwrap().read().unwrap().score;
+            let add = node.unwrap().read().score;
             score += if is_add { add } else { -add };
         }
         is_add = !is_add;

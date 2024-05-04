@@ -45,14 +45,14 @@ pub fn evaluate(freq_list: &Vec<(Vec<u8>, f32)>, config: &Vec<Set32>, stop_at: f
     config_to_t10_config_full(&config, &mut config_hm);
     for (word, value) in freq_list {
         let t10_word = word_to_t10(word, &config_hm);
-        let count = count_hm.get(&t10_word).unwrap_or(&0);
+        let count = count_hm.entry(t10_word).or_insert(0);
         if *count > 0 {
             score += value * (min(4, *count) as f32);
             if score > stop_at {
                 break;
             }
         }
-        count_hm.insert(t10_word, count + 1);
+        *count=*count + 1;
     }
     return score;
 }

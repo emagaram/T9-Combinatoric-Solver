@@ -1,9 +1,10 @@
 use std::{
     cmp::Ordering,
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use itertools::Itertools;
+use parking_lot::RwLock;
 
 use crate::{node::Node, set32::Set32, util::compare_letters};
 #[derive(Clone)]
@@ -56,10 +57,10 @@ impl NodeIterator {
         result
     }
     pub fn insert_node_from_here(&self, node: Node) {
-        let mut write_guard = self.current_node.write().unwrap();
+        let mut write_guard = self.current_node.write();
         let node_idx = write_guard
             .children
-            .binary_search_by(|n| compare_letters(n.read().unwrap().letters, node.letters));
+            .binary_search_by(|n| compare_letters(n.read().letters, node.letters));
 
         write_guard
             .children
@@ -72,15 +73,14 @@ impl NodeIterator {
         for key in path.iter() {
             let node_idx = current_node
                 .read()
-                .unwrap()
                 .children
-                .binary_search_by(|n| compare_letters(n.read().unwrap().letters, *key));
+                .binary_search_by(|n| compare_letters(n.read().letters, *key));
 
             // Handle the result of the binary search
             current_node = match node_idx {
                 Ok(idx) => {
                     // If the key exists, move deeper into the tree
-                    Arc::clone(&current_node.read().unwrap().children[idx]) // Clone the Rc of the next node in the path
+                    Arc::clone(&current_node.read().children[idx]) // Clone the Rc of the next node in the path
                 }
                 Err(_) => {
                     panic!("Node does not exist"); // Handling as per your original logic
@@ -91,7 +91,7 @@ impl NodeIterator {
         // Now insert the final node at the current location
         current_node
             .write()
-            .unwrap()
+            
             .children
             .push(Arc::new(RwLock::new(node)));
     }
@@ -178,12 +178,12 @@ impl NodeIterator {
         for key in path {
             let search = &current
                 .read()
-                .unwrap()
+                
                 .children
-                .binary_search_by(|node| compare_letters(node.read().unwrap().letters, *key));
+                .binary_search_by(|node| compare_letters(node.read().letters, *key));
             match search {
                 Ok(index) => {
-                    let clone = current.read().unwrap().children[*index].clone();
+                    let clone = current.read().children[*index].clone();
                     current = clone;
                 }
                 Err(_) => return None, // Return None if any key in the path does not match.
@@ -225,14 +225,14 @@ impl NodeIterator {
                         return None;
                     }
                     let node = node.unwrap();
-                    let node_children = &node.read().unwrap().children;
+                    let node_children = &node.read().children;
                     if node_children.is_empty() {
                         return None;
                     }
                     let end_idx: usize = Self::get_end_idx(
                         &node_children
                             .iter()
-                            .map(|n| n.read().unwrap().letters)
+                            .map(|n| n.read().letters)
                             .collect::<Vec<Set32>>(),
                         *self.path.last().unwrap(),
                     );
@@ -241,12 +241,12 @@ impl NodeIterator {
                         .take(end_idx)
                         .filter(|node| {
                             node.read()
-                                .unwrap()
+                                
                                 .letters
                                 .intersect(letters_to_exclude)
                                 .is_empty()
                         })
-                        .map(|node| node.read().unwrap().letters)
+                        .map(|node| node.read().letters)
                         .collect();
                     if valid_predecessor_children.is_none() {
                         valid_predecessor_children = Some(valid_children);
@@ -284,14 +284,14 @@ impl NodeIterator {
                         return None;
                     }
                     let node = node.unwrap();
-                    let node_children = &node.read().unwrap().children;
+                    let node_children = &node.read().children;
                     if node_children.is_empty() {
                         return None;
                     }
                     let start_idx: usize = Self::get_end_idx(
                         &node_children
                             .iter()
-                            .map(|n| n.read().unwrap().letters)
+                            .map(|n| n.read().letters)
                             .collect::<Vec<Set32>>(),
                         key,
                     );
@@ -300,12 +300,12 @@ impl NodeIterator {
                         .take(start_idx)
                         .filter(|node| {
                             node.read()
-                                .unwrap()
+                                
                                 .letters
                                 .intersect(letters_to_exclude)
                                 .is_empty()
                         })
-                        .map(|node| node.read().unwrap().letters)
+                        .map(|node| node.read().letters)
                         .collect();
                     if valid_predecessor_children.is_none() {
                         valid_predecessor_children = Some(valid_children);
@@ -323,28 +323,28 @@ impl NodeIterator {
                     &self
                         .root
                         .read()
-                        .unwrap()
+                        
                         .children
                         .iter()
-                        .map(|n| n.read().unwrap().letters)
+                        .map(|n| n.read().letters)
                         .collect::<Vec<Set32>>(),
                     key,
                 );
                 Some(
                     self.root
                         .read()
-                        .unwrap()
+                        
                         .children
                         .iter()
                         .take(start_idx)
                         .filter(|node| {
                             node.read()
-                                .unwrap()
+                                
                                 .letters
                                 .intersect(letters_to_exclude)
                                 .is_empty()
                         })
-                        .map(|node| node.read().unwrap().letters)
+                        .map(|node| node.read().letters)
                         .collect::<Vec<Set32>>(),
                 )
             }
@@ -356,7 +356,9 @@ impl NodeIterator {
 mod tests {
     // use super::*;
 
-    use std::sync::{Arc, RwLock};
+    use std::sync::Arc;
+
+    use parking_lot::RwLock;
 
     use crate::{
         create_set32_str, create_set32s_vec,
@@ -401,7 +403,7 @@ mod tests {
             let new_node = Node::new(0.0, key, vec![]);
             root.insert_node_from_root(&[], new_node);
         }
-        assert_eq!(root.root.read().unwrap().children.len(), 351);
+        assert_eq!(root.root.read().children.len(), 351);
     }
     #[test]
     fn node_iterator_node_find() {
@@ -414,21 +416,21 @@ mod tests {
         let path = vec![a.letters];
         iter.root
             .write()
-            .unwrap()
+            
             .children
             .push(Arc::new(RwLock::new(a)));
         let found_node = iter.find_node_from_root(&path);
         assert!(found_node.is_some());
-        assert_eq!(found_node.unwrap().read().unwrap().score, 2.0);
+        assert_eq!(found_node.unwrap().read().score, 2.0);
 
         let b = Node {
             score: 2.1,
             letters: create_set32_str!("b"),
             children: vec![],
         };
-        iter.root.read().unwrap().children[0]
+        iter.root.read().children[0]
             .write()
-            .unwrap()
+            
             .children
             .push(Arc::new(RwLock::new(b)));
         let path = vec![create_set32_str!("a"), create_set32_str!("b")];
@@ -437,7 +439,7 @@ mod tests {
             iter.find_node_from_root(&path)
                 .unwrap()
                 .read()
-                .unwrap()
+                
                 .score,
             2.1
         );
@@ -460,7 +462,7 @@ mod tests {
             create_set32_str!("ab"),
             vec![],
         )));
-        iter.root.write().unwrap().children.extend([yz, ef, ab]);
+        iter.root.write().children.extend([yz, ef, ab]);
         assert!(iter
             .find_node_from_root(&vec![create_set32_str!("yz")])
             .is_some());
@@ -468,7 +470,7 @@ mod tests {
             iter.find_node_from_root(&vec![create_set32_str!("yz")])
                 .unwrap()
                 .read()
-                .unwrap()
+                
                 .score
                 == 1.3
         );

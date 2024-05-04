@@ -1,7 +1,8 @@
 use ordered_float::OrderedFloat;
+use parking_lot::RwLock;
 use std::{
     collections::{BTreeSet, HashMap},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use itertools::Itertools;
@@ -103,18 +104,18 @@ impl NewScorecast {
         ABCD - ABC
          */
         // ^ add on node score Scorecast(ab cd ef) => S(ef) + S(ab cd ef) - S(ab) - S(cd) - S(ef)
-        let node_score_child = child.current_node.read().unwrap().score;
-        let node_score_parent = parent.current_node.read().unwrap().score;
+        let node_score_child = child.current_node.read().score;
+        let node_score_parent = parent.current_node.read().score;
         return OrderedFloat(node_score_child - node_score_parent);
     }
 
     pub fn get_add_amount(&self, target_num_keys: usize, target_num_letters: usize) -> Option<f32> {
-        // if self.root.read().unwrap().children.len() == 0 {
+        // if self.root.read().children.len() == 0 {
         //     return None;
         // }
         // let tup = (target_num_keys, target_num_letters);
-        // if self.best_sums.read().unwrap().contains_key(&tup){
-        //     return *self.best_sums.read().unwrap().get(&tup).unwrap();
+        // if self.best_sums.read().contains_key(&tup){
+        //     return *self.best_sums.read().get(&tup).unwrap();
         // }
         // else {
         //     let min_score = Self::dfs_min_score(self.root.clone(), target_num_keys, target_num_letters);
@@ -130,16 +131,16 @@ impl NewScorecast {
             scorecast_scores: BTreeSet::new(),
             children: vec![],
         }));
-        self.best_sums.write().unwrap().clear();
+        self.best_sums.write().clear();
         self.setup_scorecast_tree_helper(&[], current_iter)
     }
     fn setup_scorecast_tree_helper(&mut self, key_len_path: &[usize], current_iter: &NodeIterator) {
-        for child in &current_iter.current_node.read().unwrap().children {
+        for child in &current_iter.current_node.read().children {
             let full_letter_path = &mut current_iter.path.clone();
-            full_letter_path.push(child.read().unwrap().letters);
+            full_letter_path.push(child.read().letters);
             // println!("Full letter path: {:?}", set32s_to_string(full_letter_path));
             let mut full_key_len_path = key_len_path.to_vec();
-            let child_key_len = child.read().unwrap().letters.ones_indices().len();
+            let child_key_len = child.read().letters.ones_indices().len();
             full_key_len_path.push(child_key_len);
             let child_iter = current_iter
                 .find_node_iter_from_root(&full_letter_path)
@@ -150,7 +151,6 @@ impl NewScorecast {
             if let Some(our_child) = our_child {
                 our_child
                     .write()
-                    .unwrap()
                     .scorecast_scores
                     .insert(scorecast_score);
             } else {
@@ -178,12 +178,11 @@ impl NewScorecast {
         for num_letters in path {
             let search = &current
                 .read()
-                .unwrap()
                 .children
-                .binary_search_by(|node| node.read().unwrap().num_letters.cmp(num_letters));
+                .binary_search_by(|node| node.read().num_letters.cmp(num_letters));
             match search {
                 Ok(index) => {
-                    let clone = current.read().unwrap().children[*index].clone();
+                    let clone = current.read().children[*index].clone();
                     current = clone;
                 }
                 Err(_) => return None, // Return None if any key in the path does not match.
@@ -200,7 +199,6 @@ impl NewScorecast {
         // Now insert the final node at the current location
         found_node
             .write()
-            .unwrap()
             .children
             .push(Arc::new(RwLock::new(node)));
     }
@@ -243,10 +241,11 @@ impl NewScorecastNode {
 mod tests {
     use std::{
         collections::BTreeSet,
-        sync::{Arc, RwLock},
+        sync::Arc,
     };
 
     use ordered_float::OrderedFloat;
+    use parking_lot::RwLock;
 
     use crate::{
         create_btreeset, create_set32_str,
@@ -343,7 +342,7 @@ mod tests {
         scorecast.setup_scorecast_tree(&iter);
         let ab_score = scorecast.find_node(&[2]);
         assert!(ab_score.is_some());
-        // assert!((ab_score.unwrap().read().unwrap().scorecast_scores - 0.1).abs() < f32::EPSILON);
+        // assert!((ab_score.unwrap().read().scorecast_scores - 0.1).abs() < f32::EPSILON);
         // let xyz_ab_score = scorecast.find_node(&[3, 2]);
         // assert!(xyz_ab_score.is_some());
         // // S(ab) + INT(xyz ab) = 0.1 + (0.4-0.2-0.1) = 0.2
@@ -357,7 +356,7 @@ mod tests {
         //         .scorecast_scores
         // );
         // assert!(
-        //     (xyz_ab_score.unwrap().read().unwrap().scorecast_scores - 0.2).abs() < f32::EPSILON
+        //     (xyz_ab_score.unwrap().read().scorecast_scores - 0.2).abs() < f32::EPSILON
         // );
     }
 
@@ -389,10 +388,10 @@ mod tests {
         let mut scorecast = get_simple_scorecast();
         let find = scorecast.find_node(&[2]);
         assert!(find.is_some());
-        assert!(find.unwrap().read().unwrap().scorecast_scores.contains(&OrderedFloat(12.12)));
+        assert!(find.unwrap().read().scorecast_scores.contains(&OrderedFloat(12.12)));
         let find = scorecast.find_node(&[4]);
         assert!(find.is_some());
-        assert!(find.unwrap().read().unwrap().scorecast_scores.contains(&OrderedFloat(2.9)));
+        assert!(find.unwrap().read().scorecast_scores.contains(&OrderedFloat(2.9)));
         scorecast.insert_node_from_root(
             &[2],
             NewScorecastNode {
@@ -403,7 +402,7 @@ mod tests {
         );
         let find = scorecast.find_node(&[2, 2]);
         assert!(find.is_some());
-        assert!(find.unwrap().read().unwrap().scorecast_scores.contains(&OrderedFloat(1000.0)));
+        assert!(find.unwrap().read().scorecast_scores.contains(&OrderedFloat(1000.0)));
     }
     #[test]
     fn scorecast_create_scorecast_helper() {
@@ -415,7 +414,7 @@ mod tests {
         };
         iter.insert_node_from_root(&[], ab);
         let scorecast = NewScorecast::create_scorecast(iter, 1, 0, 10, NUM_LETTERS, 5);
-        let scorecast_children = &scorecast.root.read().unwrap().children;
+        let scorecast_children = &scorecast.root.read().children;
         assert_eq!(scorecast_children.len(), 0);
     }
 }
