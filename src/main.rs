@@ -22,5 +22,6 @@ pub mod freq_list;
 
 
 fn main() {
+    // rayon::ThreadPoolBuilder::new().num_threads(7).build_global().unwrap();
     solver(0.0248, 10, 3);
 }

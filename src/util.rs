@@ -4,6 +4,18 @@ use crate::{
     globals::{INDEX_TO_CHAR, SET32_SIZE},
     set32::Set32,
 };
+#[macro_export]
+macro_rules! create_btreeset {
+    ($($item:expr),* $(,)?) => {
+        {
+            let mut set = BTreeSet::new();
+            $(
+                set.insert($item);
+            )*
+            set
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! create_set32 {

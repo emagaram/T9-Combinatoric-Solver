@@ -268,6 +268,7 @@ impl Scorecast {
             return *self.best_child_sums.read().unwrap().get(&tup).unwrap();
         }
         else {
+            println!("Calculating add for {}K,{}L", target_num_keys, target_num_letters);
             let min_score = Self::dfs_min_score(self.root.clone(), target_num_keys, target_num_letters);
             self.best_child_sums.write().unwrap().insert(tup, min_score);
             return min_score;

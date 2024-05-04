@@ -64,7 +64,6 @@ fn solver_layer_evaluation_logic(
     println!("Evaluating {}", set32s_to_string(&new_path));
     let mut add = None;
     let mut heuristic_score = 0.0;
-    let mut nodes_to_insert:Vec<Node> = Vec::new();
     if target_layer != 0 {
         let start: Instant = Instant::now();
         let heuristic_evaluate = heuristic_evaluate(&iter, &new_path);
@@ -200,27 +199,32 @@ pub fn solver_layer(
             iter.insert_node_from_here(node.clone());
         }
     } else {
-        if target_layer == 0 {
-            for child in &iter.current_node.read().unwrap().children {
-                let mut new_path = iter.path.clone();
-                new_path.push(child.read().unwrap().letters);
-                solver_layer(
-                    iter.node_to_iter(child.clone(), &new_path),
-                    target_layer,
-                    scorecast.clone(),
-                    threshold,
-                    &freq_list,
-                    desired_num_keys,
-                    desired_num_letters,
-                    max_key_len,
-                );
-            }
-        } else {
+        if iter.path.len() + 1 == target_layer {
             iter.current_node
                 .read()
                 .unwrap()
                 .children
                 .par_iter()
+                .for_each(|child| {
+                    let mut new_path = iter.path.clone();
+                    new_path.push(child.read().unwrap().letters);
+                    solver_layer(
+                        iter.node_to_iter(child.clone(), &new_path),
+                        target_layer,
+                        scorecast.clone(),
+                        threshold,
+                        &freq_list,
+                        desired_num_keys,
+                        desired_num_letters,
+                        max_key_len,
+                    );
+                });
+        } else {
+            iter.current_node
+                .read()
+                .unwrap()
+                .children
+                .iter()
                 .for_each(|child| {
                     let mut new_path = iter.path.clone();
                     new_path.push(child.read().unwrap().letters);
