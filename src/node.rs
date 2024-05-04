@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::{Arc, RwLock}};
 
 /*
 
@@ -36,11 +36,11 @@ pub trait ChildrenContainer {
 pub struct Node {
     pub score: f32,
     pub letters: Set32,
-    pub children: Vec<Rc<RefCell<Node>>>,
+    pub children: Vec<Arc<RwLock<Node>>>,
 }
 
 impl Node {
-    pub fn new(score: f32, letters: Set32, children: Vec<Rc<RefCell<Node>>>) -> Self {
+    pub fn new(score: f32, letters: Set32, children: Vec<Arc<RwLock<Node>>>) -> Self {
         Node {
             score,
             letters,

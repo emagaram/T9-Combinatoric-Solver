@@ -1,12 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, sync::{Arc, RwLock}};
 
 use itertools::Itertools;
 
 use crate::{
-    globals::NUM_LETTERS,
     node_iterator::NodeIterator,
     set32::Set32,
-    util::{set32_to_string, set32s_to_string},
 };
 
 /*
@@ -52,8 +50,8 @@ FINAL: ABCD - A - B - C  D
  */
 
 pub struct Scorecast {
-    root: Rc<RefCell<ScorecastNode>>,
-    best_child_sums: HashMap<(usize,usize), Option<f32>>
+    root: Arc<RwLock<ScorecastNode>>,
+    best_child_sums: Arc<RwLock<HashMap<(usize,usize), Option<f32>>>>
 }
 
 impl Scorecast {
@@ -97,8 +95,7 @@ impl Scorecast {
         let mut num_letters_path = Vec::new();
         for key in path {
             num_letters_path.push(key.ones_indices().len());
-        }
-        
+        }   
     }
     pub fn create_scorecast(
         root: NodeIterator,
@@ -139,32 +136,32 @@ impl Scorecast {
         ABCD - ABC
          */
         // ^ add on node score Scorecast(ab cd ef) => S(ef) + S(ab cd ef) - S(ab) - S(cd) - S(ef)
-        let node_score_child = child.current_node.as_ref().borrow().score;
-        let node_score_parent = parent.current_node.as_ref().borrow().score;
+        let node_score_child = child.current_node.read().unwrap().score;
+        let node_score_parent = parent.current_node.read().unwrap().score;
         return node_score_child - node_score_parent;
     }
 
     fn set_child_sums_helper2(
         scorecast: &Scorecast,
-        root: Rc<RefCell<ScorecastNode>>,
-        current: Rc<RefCell<ScorecastNode>>,
+        root: Arc<RwLock<ScorecastNode>>,
+        current: Arc<RwLock<ScorecastNode>>,
         remaining_num_letters: usize,
         remaining_num_keys: usize,
         best_scores_for: &mut HashMap<(usize, usize), f32>, // num keys, num letters
     ) {
         if remaining_num_keys > remaining_num_letters {
-            current.borrow_mut().child_sum = f32::MAX;
+            current.write().unwrap().child_sum = f32::MAX;
             return;
         }
         if remaining_num_keys == remaining_num_letters {
-            current.borrow_mut().child_sum = 0.0;
+            current.write().unwrap().child_sum = 0.0;
             return;
         }
-        let current_children = current.as_ref().borrow().children.clone();
+        let current_children = current.read().unwrap().children.clone();
         let mut child_sum: f32 = f32::MAX;
         for child in current_children {
-            let child_letters = child.as_ref().borrow().num_letters;
-            if child.as_ref().borrow().num_letters <= remaining_num_letters {
+            let child_letters = child.read().unwrap().num_letters;
+            if child.read().unwrap().num_letters <= remaining_num_letters {
                 let mut find = best_scores_for
                     .get(&(remaining_num_keys, remaining_num_letters))
                     .cloned();
@@ -188,27 +185,27 @@ impl Scorecast {
                 );
             }
         }
-        current.borrow_mut().child_sum = child_sum;
+        current.write().unwrap().child_sum = child_sum;
     }
 
     // TODO, use f64's everywhere to keep precision, save as f32 at end
     fn set_child_sums_helper(
         scorecast: &Scorecast,
-        root: Rc<RefCell<ScorecastNode>>,
-        current: Rc<RefCell<ScorecastNode>>,
+        root: Arc<RwLock<ScorecastNode>>,
+        current: Arc<RwLock<ScorecastNode>>,
         remaining_num_letters: usize,
         remaining_num_keys: usize,
         best_scores_for: &mut HashMap<(usize, usize), f32>, // num keys, num letters
     ) -> f32 {
         if remaining_num_keys > remaining_num_letters {
-            current.borrow_mut().child_sum = f32::MAX;
+            current.write().unwrap().child_sum = f32::MAX;
             return f32::MAX;
         }
         if remaining_num_keys == remaining_num_letters {
-            current.borrow_mut().child_sum = 0.0;
+            current.write().unwrap().child_sum = 0.0;
             return 0.0;
         }
-        let current_children = current.as_ref().borrow().children.clone();
+        let current_children = current.read().unwrap().children.clone();
         if current_children.len() == 0 {
             let mut child_sum = best_scores_for
                 .get(&(remaining_num_keys, remaining_num_letters))
@@ -220,13 +217,13 @@ impl Scorecast {
                 best_scores_for.insert((remaining_num_keys, remaining_num_letters), min_score);
                 child_sum = Some(min_score);
             }
-            current.borrow_mut().child_sum = child_sum.unwrap();
+            current.write().unwrap().child_sum = child_sum.unwrap();
             return child_sum.unwrap();
         } else {
             let mut child_sum = f32::MAX;
             for child in current_children {
-                let child_letters = child.as_ref().borrow().num_letters;
-                if child.as_ref().borrow().num_letters <= remaining_num_letters {
+                let child_letters = child.read().unwrap().num_letters;
+                if child.read().unwrap().num_letters <= remaining_num_letters {
                     let child_find_sum = Self::set_child_sums_helper(
                         scorecast,
                         root.clone(),
@@ -235,10 +232,10 @@ impl Scorecast {
                         remaining_num_keys - 1,
                         best_scores_for,
                     );
-                    child_sum = child_sum.min(child_find_sum + child.as_ref().borrow().score);
+                    child_sum = child_sum.min(child_find_sum + child.read().unwrap().score);
                 }
             }
-            current.borrow_mut().child_sum = child_sum;
+            current.write().unwrap().child_sum = child_sum;
             return child_sum;
         }
     }
@@ -262,42 +259,42 @@ impl Scorecast {
         // )
     }
 
-    pub fn get_add_amount(&mut self,target_num_keys: usize, target_num_letters: usize)->Option<f32>{
-        if self.root.as_ref().borrow().children.len() == 0 {
+    pub fn get_add_amount(&self,target_num_keys: usize, target_num_letters: usize)->Option<f32>{
+        if self.root.read().unwrap().children.len() == 0 {
             return None;
         }
         let tup = (target_num_keys, target_num_letters);
-        if self.best_child_sums.contains_key(&tup){
-            return *self.best_child_sums.get(&tup).unwrap();
+        if self.best_child_sums.read().unwrap().contains_key(&tup){
+            return *self.best_child_sums.read().unwrap().get(&tup).unwrap();
         }
         else {
             let min_score = Self::dfs_min_score(self.root.clone(), target_num_keys, target_num_letters);
-            self.best_child_sums.insert(tup, min_score);
+            self.best_child_sums.write().unwrap().insert(tup, min_score);
             return min_score;
         }
     }
     // Function to find the path with the smallest score using DFS
     pub fn dfs_min_score(
-        root: Rc<RefCell<ScorecastNode>>,
+        root: Arc<RwLock<ScorecastNode>>,
         desired_key_len: usize,
         desired_num_letters: usize,
     ) -> Option<f32> {
         fn dfs(
-            root: Rc<RefCell<ScorecastNode>>,
-            node: Rc<RefCell<ScorecastNode>>,
+            root: Arc<RwLock<ScorecastNode>>,
+            node: Arc<RwLock<ScorecastNode>>,
             num_keys_remaining: usize,
             num_letters_remaining: usize,
             mut cumulative_score: f32,
             mut best_found: Option<f32>,
             max_allowed_key_size: usize,
         ) -> Option<f32> {
-            cumulative_score += node.as_ref().borrow().score;
-            let num_keys_remaining = if node.as_ref().borrow().num_letters > 0 {
+            cumulative_score += node.read().unwrap().score;
+            let num_keys_remaining = if node.read().unwrap().num_letters > 0 {
                 num_keys_remaining - 1
             } else {
                 num_keys_remaining
             };
-            let num_letters_remaining = num_letters_remaining - node.as_ref().borrow().num_letters;
+            let num_letters_remaining = num_letters_remaining - node.read().unwrap().num_letters;
             if num_keys_remaining == num_letters_remaining {
                 if let Some(bf) = best_found {
                     best_found = Some(bf.min(cumulative_score));
@@ -308,12 +305,12 @@ impl Scorecast {
             }
             if num_keys_remaining == 0
                 || num_keys_remaining > num_letters_remaining
-                || node.as_ref().borrow().num_letters > num_letters_remaining
+                || node.read().unwrap().num_letters > num_letters_remaining
             {
                 return None;
             }
 
-            if node.as_ref().borrow().children.is_empty() {
+            if node.read().unwrap().children.is_empty() {
                 let res = dfs(
                     root.clone(),
                     root,
@@ -340,8 +337,8 @@ impl Scorecast {
                     }
                 }
             } else {
-                for child in &node.as_ref().borrow().children {
-                    if child.as_ref().borrow().num_letters <= num_letters_remaining && child.as_ref().borrow().num_letters <= max_allowed_key_size {
+                for child in &node.read().unwrap().children {
+                    if child.read().unwrap().num_letters <= num_letters_remaining && child.read().unwrap().num_letters <= max_allowed_key_size {
                         let res = dfs(
                             root.clone(),
                             child.clone(),
@@ -349,7 +346,7 @@ impl Scorecast {
                             num_letters_remaining,
                             cumulative_score,
                             best_found,
-                            max_allowed_key_size.min(child.as_ref().borrow().num_letters)
+                            max_allowed_key_size.min(child.read().unwrap().num_letters)
                         );
                         match (res.is_some(), best_found.is_some()) {
                             (true, true) => {
@@ -426,17 +423,17 @@ impl Scorecast {
     // }
 
     pub fn setup_scorecast_tree(&mut self, current_iter: &NodeIterator) {
-        self.root = Rc::new(RefCell::new(ScorecastNode {
+        self.root = Arc::new(RwLock::new(ScorecastNode {
             num_letters: 0,
             score: 0.0,
             child_sum: f32::MAX,
             children: vec![],
         }));
-        self.best_child_sums.clear();
+        self.best_child_sums.write().unwrap().clear();
         self.setup_scorecast_tree_helper(&[], current_iter)
     }
     fn setup_scorecast_tree_helper(&mut self, key_len_path: &[usize], current_iter: &NodeIterator) {
-        for child in &current_iter.current_node.as_ref().borrow().children {
+        for child in &current_iter.current_node.read().unwrap().children {
             // println!(
             //     "Child {} children: {}",
             //     set32_to_string(child.as_ref().borrow().letters),
@@ -451,10 +448,10 @@ impl Scorecast {
             //     )
             // );
             let full_letter_path = &mut current_iter.path.clone();
-            full_letter_path.push(child.as_ref().borrow().letters);
+            full_letter_path.push(child.read().unwrap().letters);
             // println!("Full letter path: {:?}", set32s_to_string(full_letter_path));
             let mut full_key_len_path = key_len_path.to_vec();
-            let child_key_len = child.as_ref().borrow().letters.ones_indices().len();
+            let child_key_len = child.read().unwrap().letters.ones_indices().len();
             full_key_len_path.push(child_key_len);
             let child_iter = current_iter
                 .find_node_iter_from_root(&full_letter_path)
@@ -463,8 +460,8 @@ impl Scorecast {
 
             let our_child = self.find_node(&full_key_len_path);
             if let Some(our_child) = our_child {
-                if our_child.as_ref().borrow().score > scorecast_score {
-                    our_child.borrow_mut().score = scorecast_score;
+                if our_child.read().unwrap().score > scorecast_score {
+                    our_child.write().unwrap().score = scorecast_score;
                 }
             } else {
                 self.insert_node_from_root(
@@ -481,21 +478,20 @@ impl Scorecast {
         }
     }
 
-    fn find_node(&self, path: &[usize]) -> Option<Rc<RefCell<ScorecastNode>>> {
+    fn find_node(&self, path: &[usize]) -> Option<Arc<RwLock<ScorecastNode>>> {
         if path.is_empty() {
             return Some(self.root.clone());
         }
 
-        let mut current: Rc<RefCell<ScorecastNode>> = self.root.clone();
+        let mut current: Arc<RwLock<ScorecastNode>> = self.root.clone();
         for num_letters in path {
             let search = &current
-                .as_ref()
-                .borrow()
+                .read().unwrap()
                 .children
-                .binary_search_by(|node| node.as_ref().borrow().num_letters.cmp(num_letters));
+                .binary_search_by(|node| node.read().unwrap().num_letters.cmp(num_letters));
             match search {
                 Ok(index) => {
-                    let clone = current.as_ref().borrow().children[*index].clone();
+                    let clone = current.read().unwrap().children[*index].clone();
                     current = clone;
                 }
                 Err(_) => return None, // Return None if any key in the path does not match.
@@ -511,22 +507,22 @@ impl Scorecast {
         let found_node = found_node.unwrap();
         // Now insert the final node at the current location
         found_node
-            .borrow_mut()
+            .write().unwrap()
             .children
-            .push(Rc::new(RefCell::new(node)));
+            .push(Arc::new(RwLock::new(node)));
     }
 }
 
 impl Default for Scorecast {
     fn default() -> Self {
         Self {
-            root: Rc::new(RefCell::new(ScorecastNode {
+            root: Arc::new(RwLock::new(ScorecastNode {
                 num_letters: 0,
                 score: 0.0,
                 child_sum: f32::MAX,
                 children: vec![],
             })),
-            best_child_sums: HashMap::new(),
+            best_child_sums: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -535,7 +531,7 @@ pub struct ScorecastNode {
     num_letters: usize,
     score: f32,
     child_sum: f32,
-    children: Vec<Rc<RefCell<ScorecastNode>>>,
+    children: Vec<Arc<RwLock<ScorecastNode>>>,
 }
 
 impl ScorecastNode {
@@ -543,7 +539,7 @@ impl ScorecastNode {
         num_letters: usize,
         score: f32,
         child_sum: f32,
-        children: Vec<Rc<RefCell<ScorecastNode>>>,
+        children: Vec<Arc<RwLock<ScorecastNode>>>,
     ) -> ScorecastNode {
         ScorecastNode {
             num_letters,
@@ -556,11 +552,7 @@ impl ScorecastNode {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        borrow::{Borrow, BorrowMut},
-        cell::RefCell,
-        rc::Rc,
-    };
+    use std::sync::{Arc, RwLock};
 
     use crate::{
         create_set32_str,
@@ -572,7 +564,7 @@ mod tests {
 
     use super::{Scorecast, ScorecastNode};
     fn create_empty_node_iterator() -> NodeIterator {
-        let root = Rc::new(RefCell::new(Node::new(0.0, Set32::EMPTY, vec![])));
+        let root = Arc::new(RwLock::new(Node::new(0.0, Set32::EMPTY, vec![])));
         NodeIterator {
             current_node: root.clone(),
             path: vec![],
@@ -590,7 +582,7 @@ mod tests {
     fn get_complex_scorecast() -> Scorecast {
         let mut scorecast = Scorecast::default();
         scorecast.insert_node_from_root(&[], ScorecastNode::new(2, 0.112, 0.0, vec![]));
-        let c4_1 = Rc::new(RefCell::new(ScorecastNode::new(3, 1.2, 0.0, vec![])));
+        let c4_1 = Arc::new(RwLock::new(ScorecastNode::new(3, 1.2, 0.0, vec![])));
         scorecast.insert_node_from_root(&[], ScorecastNode::new(4, 2.9, 0.0, vec![c4_1]));
 
         scorecast.insert_node_from_root(&[], ScorecastNode::new(5, 1.5, 0.0, vec![]));
@@ -662,23 +654,23 @@ mod tests {
         assert!(root_sc.is_some());
         println!(
             "ab child_sum: {}",
-            ab_sc.clone().unwrap().as_ref().borrow().child_sum
+            ab_sc.clone().unwrap().read().unwrap().child_sum
         );
         assert!(
-            (ab_sc.clone().unwrap().as_ref().borrow().child_sum - ab.score).abs() < f32::EPSILON
+            (ab_sc.clone().unwrap().read().unwrap().child_sum - ab.score).abs() < f32::EPSILON
         );
         println!(
             "xyz child_sum: {}",
-            xyz_sc.clone().unwrap().as_ref().borrow().child_sum
+            xyz_sc.clone().unwrap().read().unwrap().child_sum
         );
         println!(
             "root child_sum: {}",
-            root_sc.clone().unwrap().as_ref().borrow().child_sum
+            root_sc.clone().unwrap().read().unwrap().child_sum
         );
-        assert!((xyz_sc.clone().unwrap().as_ref().borrow().child_sum).abs() < f32::EPSILON);
+        assert!((xyz_sc.clone().unwrap().read().unwrap().child_sum).abs() < f32::EPSILON);
         assert!(
-            (root_sc.clone().unwrap().as_ref().borrow().child_sum
-                - 2.0 * ab_sc.clone().unwrap().as_ref().borrow().child_sum)
+            (root_sc.clone().unwrap().read().unwrap().child_sum
+                - 2.0 * ab_sc.clone().unwrap().read().unwrap().child_sum)
                 .abs()
                 < f32::EPSILON
         );
@@ -686,7 +678,7 @@ mod tests {
         iter.find_node_from_root(&[create_set32_str!("ab")])
             .unwrap()
             .as_ref()
-            .borrow_mut()
+            .write().unwrap()
             .score = 0.28;
         scorecast.setup_scorecast_tree(&iter);
         // Now we should get a different result, xyz is least
@@ -694,10 +686,10 @@ mod tests {
         let root_sc = scorecast.find_node(&[]);
         println!(
             "root child_sum: {}",
-            root_sc.clone().unwrap().as_ref().borrow().child_sum
+            root_sc.clone().unwrap().read().unwrap().child_sum
         );
         assert!(
-            (root_sc.clone().unwrap().as_ref().borrow().child_sum - xyz.score).abs() < f32::EPSILON
+            (root_sc.clone().unwrap().read().unwrap().child_sum - xyz.score).abs() < f32::EPSILON
         );
     }
     #[test]
@@ -713,15 +705,15 @@ mod tests {
         scorecast.setup_scorecast_tree(&iter);
         let ab_score = scorecast.find_node(&[2]);
         assert!(ab_score.is_some());
-        assert!((ab_score.unwrap().as_ref().borrow().score - 0.1).abs() < f32::EPSILON);
+        assert!((ab_score.unwrap().read().unwrap().score - 0.1).abs() < f32::EPSILON);
         let xyz_ab_score = scorecast.find_node(&[3, 2]);
         assert!(xyz_ab_score.is_some());
         // S(ab) + INT(xyz ab) = 0.1 + (0.4-0.2-0.1) = 0.2
         println!(
             "{} score",
-            xyz_ab_score.clone().unwrap().as_ref().borrow().score
+            xyz_ab_score.clone().unwrap().read().unwrap().score
         );
-        assert!((xyz_ab_score.unwrap().as_ref().borrow().score - 0.2).abs() < f32::EPSILON);
+        assert!((xyz_ab_score.unwrap().read().unwrap().score - 0.2).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -769,10 +761,10 @@ mod tests {
         let mut scorecast = get_simple_scorecast();
         let find = scorecast.find_node(&[2]);
         assert!(find.is_some());
-        assert_eq!(find.unwrap().as_ref().borrow().score, 12.12);
+        assert_eq!(find.unwrap().read().unwrap().score, 12.12);
         let find = scorecast.find_node(&[4]);
         assert!(find.is_some());
-        assert_eq!(find.unwrap().as_ref().borrow().score, 2.9);
+        assert_eq!(find.unwrap().read().unwrap().score, 2.9);
         scorecast.insert_node_from_root(
             &[2],
             ScorecastNode {
@@ -784,7 +776,7 @@ mod tests {
         );
         let find = scorecast.find_node(&[2, 2]);
         assert!(find.is_some());
-        assert_eq!(find.unwrap().as_ref().borrow().score, 1000.0);
+        assert_eq!(find.unwrap().read().unwrap().score, 1000.0);
     }
     #[test]
     fn scorecast_create_scorecast_helper() {
@@ -796,7 +788,7 @@ mod tests {
         };
         iter.insert_node_from_root(&[], ab);
         let scorecast = Scorecast::create_scorecast(iter, 1, 0, 10, NUM_LETTERS, 5);
-        let scorecast_children = &scorecast.root.as_ref().borrow().children;
+        let scorecast_children = &scorecast.root.read().unwrap().children;
         assert_eq!(scorecast_children.len(), 0);
     }
 }

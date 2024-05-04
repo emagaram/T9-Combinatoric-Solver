@@ -1,15 +1,17 @@
-use std::{borrow::Borrow, cell::RefCell, cmp::Ordering, rc::Rc, sync::{Arc, RwLock}};
+use std::{
+    cmp::Ordering,
+    sync::{Arc, RwLock},
+};
 
 use itertools::Itertools;
 
 use crate::{node::Node, set32::Set32, util::compare_letters};
-
+#[derive(Clone)]
 pub struct NodeIterator {
     pub root: Arc<RwLock<Node>>,
     pub current_node: Arc<RwLock<Node>>,
     pub path: Vec<Set32>,
 }
-
 
 impl NodeIterator {
     pub fn create_empty() -> NodeIterator {
@@ -19,12 +21,8 @@ impl NodeIterator {
             path: vec![],
             root,
         }
-    }    
-    pub fn new(
-        root: Arc<RwLock<Node>>,
-        current_node: Arc<RwLock<Node>>,
-        path: Vec<Set32>,
-    ) -> Self {
+    }
+    pub fn new(root: Arc<RwLock<Node>>, current_node: Arc<RwLock<Node>>, path: Vec<Set32>) -> Self {
         NodeIterator {
             root,
             current_node,
@@ -57,25 +55,34 @@ impl NodeIterator {
         result.reverse();
         result
     }
-    pub fn insert_node_from_here(&mut self, node: Node) {
-        self.current_node
+    pub fn insert_node_from_here(&self, node: Node) {
+        let node_idx = self
+            .current_node
             .read()
+            .unwrap()
             .children
-            .push(Rc::new(RwLock::new(node)));
-    }    
-    pub fn insert_node_from_root(&mut self, path: &[Set32], node: Node) {
+            .binary_search_by(|n| compare_letters(n.read().unwrap().letters, node.letters));
+
+        self.current_node
+            .write()
+            .unwrap()
+            .children
+            .insert(node_idx.unwrap_or_else(|e|e), Arc::new(RwLock::new(node)));
+    }
+    pub fn insert_node_from_root(&self, path: &[Set32], node: Node) {
         let mut current_node: Arc<RwLock<Node>> = self.root.clone();
         for key in path.iter() {
             let node_idx = current_node
-                .borrow_mut()
+                .read()
+                .unwrap()
                 .children
-                .binary_search_by(|n| compare_letters(n.as_ref().borrow().letters, *key));
+                .binary_search_by(|n| compare_letters(n.read().unwrap().letters, *key));
 
             // Handle the result of the binary search
             current_node = match node_idx {
                 Ok(idx) => {
                     // If the key exists, move deeper into the tree
-                    Rc::clone(&current_node.as_ref().borrow().children[idx]) // Clone the Rc of the next node in the path
+                    Arc::clone(&current_node.read().unwrap().children[idx]) // Clone the Rc of the next node in the path
                 }
                 Err(_) => {
                     panic!("Node does not exist"); // Handling as per your original logic
@@ -85,9 +92,10 @@ impl NodeIterator {
 
         // Now insert the final node at the current location
         current_node
-            .borrow_mut()
+            .write()
+            .unwrap()
             .children
-            .push(Rc::new(RwLock::new(node)));
+            .push(Arc::new(RwLock::new(node)));
     }
 
     pub fn calculate_predecessors_from_path(path: &[Set32]) -> Vec<Vec<Set32>> {
@@ -103,8 +111,8 @@ impl NodeIterator {
         result
     }
 
-    pub fn get_predecessors_from_path(&self, path: &[Set32]) -> Option<Vec<NodeIterator>>{
-        let mut iterators:Vec<NodeIterator> = vec![];
+    pub fn get_predecessors_from_path(&self, path: &[Set32]) -> Option<Vec<NodeIterator>> {
+        let mut iterators: Vec<NodeIterator> = vec![];
         for predecessor in Self::calculate_predecessors_from_path(&path) {
             let predecessor_iter = self.find_node_iter_from_root(&predecessor);
             if predecessor_iter.is_none() {
@@ -139,11 +147,11 @@ impl NodeIterator {
 
         result
     }
-    pub fn node_to_iter(&self, node: Arc<RwLock<Node>>, path:&[Set32]) -> NodeIterator {
+    pub fn node_to_iter(&self, node: Arc<RwLock<Node>>, path: &[Set32]) -> NodeIterator {
         NodeIterator {
             root: self.root.clone(),
             current_node: node.clone(),
-            path: path.to_vec()
+            path: path.to_vec(),
         }
     }
     pub fn find_node_iter_from_root(&self, path: &[Set32]) -> Option<NodeIterator> {
@@ -159,8 +167,11 @@ impl NodeIterator {
             return None;
         }
         Some(self.node_to_iter(node.unwrap(), path))
-    }    
-    pub fn find_node_from_node(node:Arc<RwLock<Node>>, path: &[Set32]) -> Option<Arc<RwLock<Node>>> {
+    }
+    pub fn find_node_from_node(
+        node: Arc<RwLock<Node>>,
+        path: &[Set32],
+    ) -> Option<Arc<RwLock<Node>>> {
         if path.is_empty() {
             return Some(node.clone());
         }
@@ -168,26 +179,26 @@ impl NodeIterator {
         let mut current: Arc<RwLock<Node>> = node.clone();
         for key in path {
             let search = &current
-                .as_ref()
-                .borrow()
+                .read()
+                .unwrap()
                 .children
-                .binary_search_by(|node| compare_letters(node.as_ref().borrow().letters, *key));
+                .binary_search_by(|node| compare_letters(node.read().unwrap().letters, *key));
             match search {
                 Ok(index) => {
-                    let clone = current.as_ref().borrow().children[*index].clone();
+                    let clone = current.read().unwrap().children[*index].clone();
                     current = clone;
                 }
                 Err(_) => return None, // Return None if any key in the path does not match.
             }
         }
         Some(current)
-    }        
+    }
     pub fn find_node_from_root(&self, path: &[Set32]) -> Option<Arc<RwLock<Node>>> {
         Self::find_node_from_node(self.root.clone(), path)
     }
     pub fn find_node_from_here(&self, path: &[Set32]) -> Option<Arc<RwLock<Node>>> {
         Self::find_node_from_node(self.current_node.clone(), path)
-    }    
+    }
     fn get_end_idx(keys: &[Set32], target: Set32) -> usize {
         let start = keys.binary_search_by(|node| compare_letters(*node, target));
         if start.is_ok() {
@@ -216,14 +227,14 @@ impl NodeIterator {
                         return None;
                     }
                     let node = node.unwrap();
-                    let node_children = &node.as_ref().borrow().children;
+                    let node_children = &node.read().unwrap().children;
                     if node_children.is_empty() {
                         return None;
                     }
                     let end_idx: usize = Self::get_end_idx(
                         &node_children
                             .iter()
-                            .map(|n| n.as_ref().borrow().letters)
+                            .map(|n| n.read().unwrap().letters)
                             .collect::<Vec<Set32>>(),
                         *self.path.last().unwrap(),
                     );
@@ -231,13 +242,13 @@ impl NodeIterator {
                         .iter()
                         .take(end_idx)
                         .filter(|node| {
-                            node.as_ref()
-                                .borrow()
+                            node.read()
+                                .unwrap()
                                 .letters
                                 .intersect(letters_to_exclude)
                                 .is_empty()
                         })
-                        .map(|node| node.as_ref().borrow().letters)
+                        .map(|node| node.read().unwrap().letters)
                         .collect();
                     if valid_predecessor_children.is_none() {
                         valid_predecessor_children = Some(valid_children);
@@ -275,14 +286,14 @@ impl NodeIterator {
                         return None;
                     }
                     let node = node.unwrap();
-                    let node_children = &node.as_ref().borrow().children;
+                    let node_children = &node.read().unwrap().children;
                     if node_children.is_empty() {
                         return None;
                     }
                     let start_idx: usize = Self::get_end_idx(
                         &node_children
                             .iter()
-                            .map(|n| n.as_ref().borrow().letters)
+                            .map(|n| n.read().unwrap().letters)
                             .collect::<Vec<Set32>>(),
                         key,
                     );
@@ -290,13 +301,13 @@ impl NodeIterator {
                         .iter()
                         .take(start_idx)
                         .filter(|node| {
-                            node.as_ref()
-                                .borrow()
+                            node.read()
+                                .unwrap()
                                 .letters
                                 .intersect(letters_to_exclude)
                                 .is_empty()
                         })
-                        .map(|node| node.as_ref().borrow().letters)
+                        .map(|node| node.read().unwrap().letters)
                         .collect();
                     if valid_predecessor_children.is_none() {
                         valid_predecessor_children = Some(valid_children);
@@ -313,29 +324,29 @@ impl NodeIterator {
                 let start_idx: usize = Self::get_end_idx(
                     &self
                         .root
-                        .as_ref()
-                        .borrow()
+                        .read()
+                        .unwrap()
                         .children
                         .iter()
-                        .map(|n| n.as_ref().borrow().letters)
+                        .map(|n| n.read().unwrap().letters)
                         .collect::<Vec<Set32>>(),
                     key,
                 );
                 Some(
                     self.root
-                        .as_ref()
-                        .borrow()
+                        .read()
+                        .unwrap()
                         .children
                         .iter()
                         .take(start_idx)
                         .filter(|node| {
-                            node.as_ref()
-                                .borrow()
+                            node.read()
+                                .unwrap()
                                 .letters
                                 .intersect(letters_to_exclude)
                                 .is_empty()
                         })
-                        .map(|node| node.as_ref().borrow().letters)
+                        .map(|node| node.read().unwrap().letters)
                         .collect::<Vec<Set32>>(),
                 )
             }
@@ -347,7 +358,7 @@ impl NodeIterator {
 mod tests {
     // use super::*;
 
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::{Arc, RwLock};
 
     use crate::{
         create_set32_str, create_set32s_vec,
@@ -359,7 +370,7 @@ mod tests {
     use super::NodeIterator;
 
     fn create_empty_node_iterator() -> NodeIterator {
-        let root = Rc::new(RwLock::new(Node::new(0.0, Set32::EMPTY, vec![])));
+        let root = Arc::new(RwLock::new(Node::new(0.0, Set32::EMPTY, vec![])));
         NodeIterator {
             current_node: root.clone(),
             path: vec![],
@@ -392,7 +403,7 @@ mod tests {
             let new_node = Node::new(0.0, key, vec![]);
             root.insert_node_from_root(&[], new_node);
         }
-        assert_eq!(root.root.as_ref().borrow().children.len(), 351);
+        assert_eq!(root.root.read().unwrap().children.len(), 351);
     }
     #[test]
     fn node_iterator_node_find() {
@@ -404,27 +415,34 @@ mod tests {
         };
         let path = vec![a.letters];
         iter.root
-            .as_ref()
-            .borrow_mut()
+            .write()
+            .unwrap()
             .children
-            .push(Rc::new(RwLock::new(a)));
+            .push(Arc::new(RwLock::new(a)));
         let found_node = iter.find_node_from_root(&path);
         assert!(found_node.is_some());
-        assert_eq!(found_node.unwrap().as_ref().borrow().score, 2.0);
+        assert_eq!(found_node.unwrap().read().unwrap().score, 2.0);
 
         let b = Node {
             score: 2.1,
             letters: create_set32_str!("b"),
             children: vec![],
         };
-        iter.root.as_ref().borrow().children[0]
-            .as_ref()
-            .borrow_mut()
+        iter.root.read().unwrap().children[0]
+            .write()
+            .unwrap()
             .children
-            .push(Rc::new(RwLock::new(b)));
+            .push(Arc::new(RwLock::new(b)));
         let path = vec![create_set32_str!("a"), create_set32_str!("b")];
         assert!(iter.find_node_from_root(&path).is_some());
-        assert_eq!(iter.find_node_from_root(&path).unwrap().as_ref().borrow().score, 2.1);
+        assert_eq!(
+            iter.find_node_from_root(&path)
+                .unwrap()
+                .read()
+                .unwrap()
+                .score,
+            2.1
+        );
 
         let path = vec![
             create_set32_str!("a"),
@@ -433,37 +451,35 @@ mod tests {
         ];
         assert!(iter.find_node_from_root(&path).is_none());
 
-        let yz = Rc::new(RwLock::new(Node::new(
-            1.3,
-            create_set32_str!("yz"),
-            vec![],
-        )));
-        let ef = Rc::new(RwLock::new(Node::new(
+        let yz = Arc::new(RwLock::new(Node::new(1.3, create_set32_str!("yz"), vec![])));
+        let ef = Arc::new(RwLock::new(Node::new(
             1.01,
             create_set32_str!("ef"),
             vec![],
         )));
-        let ab = Rc::new(RwLock::new(Node::new(
+        let ab = Arc::new(RwLock::new(Node::new(
             1.01,
             create_set32_str!("ab"),
             vec![],
         )));
-        iter.root
-            .as_ref()
-            .borrow_mut()
-            .children
-            .extend([yz, ef, ab]);
-        assert!(iter.find_node_from_root(&vec![create_set32_str!("yz")]).is_some());
+        iter.root.write().unwrap().children.extend([yz, ef, ab]);
+        assert!(iter
+            .find_node_from_root(&vec![create_set32_str!("yz")])
+            .is_some());
         assert!(
             iter.find_node_from_root(&vec![create_set32_str!("yz")])
                 .unwrap()
-                .as_ref()
-                .borrow()
+                .read()
+                .unwrap()
                 .score
                 == 1.3
         );
-        assert!(iter.find_node_from_root(&vec![create_set32_str!("ef")]).is_some());
-        assert!(iter.find_node_from_root(&vec![create_set32_str!("ab")]).is_some());
+        assert!(iter
+            .find_node_from_root(&vec![create_set32_str!("ef")])
+            .is_some());
+        assert!(iter
+            .find_node_from_root(&vec![create_set32_str!("ab")])
+            .is_some());
     }
 
     #[test]
