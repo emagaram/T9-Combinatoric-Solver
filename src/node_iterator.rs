@@ -56,19 +56,17 @@ impl NodeIterator {
         result
     }
     pub fn insert_node_from_here(&self, node: Node) {
-        let node_idx = self
-            .current_node
-            .read()
-            .unwrap()
+        let mut write_guard = self.current_node.write().unwrap();
+        let node_idx = write_guard
             .children
             .binary_search_by(|n| compare_letters(n.read().unwrap().letters, node.letters));
 
-        self.current_node
-            .write()
-            .unwrap()
+        write_guard
             .children
-            .insert(node_idx.unwrap_or_else(|e|e), Arc::new(RwLock::new(node)));
+            .insert(node_idx.unwrap_or_else(|e| e), Arc::new(RwLock::new(node)));
     }
+
+    // TODO, if use anywhere, make safe like insert_from_here
     pub fn insert_node_from_root(&self, path: &[Set32], node: Node) {
         let mut current_node: Arc<RwLock<Node>> = self.root.clone();
         for key in path.iter() {
@@ -379,7 +377,7 @@ mod tests {
     }
     #[test]
     fn node_iterator_new_get_children_to_evaluate() {
-        let mut root = create_empty_node_iterator();
+        let root = create_empty_node_iterator();
         let base_keys = NodeIterator::get_keys_to_evaluate(10, NUM_LETTERS, 2);
         let children = root.new_get_children_to_evaluate(10, NUM_LETTERS, 2);
         assert!(children.is_some());
@@ -397,7 +395,7 @@ mod tests {
 
     #[test]
     fn node_iterator_insert_node() {
-        let mut root = create_empty_node_iterator();
+        let root = create_empty_node_iterator();
         let base_keys = NodeIterator::get_keys_to_evaluate(10, NUM_LETTERS, 2);
         for key in base_keys {
             let new_node = Node::new(0.0, key, vec![]);
@@ -484,7 +482,7 @@ mod tests {
 
     #[test]
     fn node_iterator_get_children_to_evaluate() {
-        let mut root = create_empty_node_iterator();
+        let root = create_empty_node_iterator();
         let base_keys = NodeIterator::get_keys_to_evaluate(10, NUM_LETTERS, 2);
         for key in base_keys {
             let new_node = Node::new(0.0, key, vec![]);

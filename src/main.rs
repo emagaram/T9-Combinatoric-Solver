@@ -17,6 +17,7 @@ pub mod new_solver;
 pub mod new_evaluate;
 pub mod heuristic_evaluate;
 pub mod scorecast;
+pub mod scorecast_new;
 pub mod freq_list;
 
 
