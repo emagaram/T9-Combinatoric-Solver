@@ -65,30 +65,13 @@ impl NewScorecast {
             num_letters_path.push(key.ones_indices().len());
         }
     }
-    pub fn create_scorecast(
-        root: NodeIterator,
-        tree_height: usize,
-        target_height: usize,
-        target_num_keys: usize,
-        num_letters: usize,
-        max_key_len: usize,
-    ) -> NewScorecast {
-        let scorecast: NewScorecast = NewScorecast::default();
-        // scorecast = Self::setup_scorecast_tree(scorecast, &[], root, target_num_keys, num_letters);
-        scorecast
-    }
     fn calculate_scorecast_score(parent: &NodeIterator, child: &NodeIterator) -> OrderedFloat<f32> {
-        //Wrong: INT(ABC) + INT(AB) + INT(AC) + INT(AD) = S(ABCD) - S(A) - S(B) - S(C) - S(D)
-        //Right: At C, INT(ABC) + INT(BC) + INT(AC), everything that intersects with C
         /*
-        INT(ABC) + INT(BC) + INT(AC) = (ABC - AB - AC - BC + A + B + C) + (BC - B - C) + (AC-A-C)
-
-        = ABC - AB - C
+        INT(ABC) + INT(BC) + INT(AC) = (ABC - AB - AC - BC + A + B + C) + (BC - B - C) + (AC-A-C) = ABC - AB - C
         Scorecast(ABCD) = D + (ABCD - ABC - D) = ABCD - ABC
         Scorecast(ABC) = C + (ABC - AB - C) => ABC - AB
         Scorecast(AB) = B + (AB - A - B) => AB - A
         Scorecast(A) = A
-
         Scorecast of ABCD: S(D) +  INT(ABCD) + INT(ABD) + INT(ACD) + INT(BCD) + INT(AD) + INT(BD) + INT(CD)
         =>
         D + (ABCD - ABC - ABD - ACD - BCD + AB + AC + AD + BC + BD + CD - A - B - C - D)
@@ -100,28 +83,13 @@ impl NewScorecast {
         + (CD-C-D)
         =
         ABCD - ABC
-        =
-        ABCD - ABC
          */
-        // ^ add on node score Scorecast(ab cd ef) => S(ef) + S(ab cd ef) - S(ab) - S(cd) - S(ef)
         let node_score_child = child.current_node.read().score;
         let node_score_parent = parent.current_node.read().score;
         return OrderedFloat(node_score_child - node_score_parent);
     }
 
     pub fn get_add_amount(&self, target_num_keys: usize, target_num_letters: usize) -> Option<f32> {
-        // if self.root.read().children.len() == 0 {
-        //     return None;
-        // }
-        // let tup = (target_num_keys, target_num_letters);
-        // if self.best_sums.read().contains_key(&tup){
-        //     return *self.best_sums.read().get(&tup).unwrap();
-        // }
-        // else {
-        //     let min_score = Self::dfs_min_score(self.root.clone(), target_num_keys, target_num_letters);
-        //     self.best_sums.write().unwrap().insert(tup, min_score);
-        //     return min_score;
-        // }
         None
     }
 
@@ -403,18 +371,5 @@ mod tests {
         let find = scorecast.find_node(&[2, 2]);
         assert!(find.is_some());
         assert!(find.unwrap().read().scorecast_scores.contains(&OrderedFloat(1000.0)));
-    }
-    #[test]
-    fn scorecast_create_scorecast_helper() {
-        let mut iter = create_empty_node_iterator();
-        let ab = Node {
-            children: vec![],
-            letters: create_set32_str!("ab"),
-            score: 0.15,
-        };
-        iter.insert_node_from_root(&[], ab);
-        let scorecast = NewScorecast::create_scorecast(iter, 1, 0, 10, NUM_LETTERS, 5);
-        let scorecast_children = &scorecast.root.read().children;
-        assert_eq!(scorecast_children.len(), 0);
     }
 }

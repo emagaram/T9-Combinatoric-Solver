@@ -46,10 +46,10 @@ pub fn evaluate(freq_list: &Vec<(Vec<u8>, f32)>, config: &Vec<Set32>, stop_at: f
     for (word, value) in freq_list {
         let t10_word = word_to_t10(word, &config_hm);
         let count = count_hm.entry(t10_word).or_insert(0);
-        if *count > 0 {
+        if *count != 0 {
             score += value * (min(4, *count) as f32);
             if score > stop_at {
-                break;
+                return score;
             }
         }
         *count=*count + 1;

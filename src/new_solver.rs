@@ -43,7 +43,7 @@ pub fn solver(threshold: f32, desired_num_keys: usize, max_key_len: usize) {
         let start = Instant::now();
         scorecast.write().setup_scorecast_tree(&iter);
         println!("Scorecast tree created in {:?}", start.elapsed());
-        if i == 1 {
+        if i == 0 {
             panic!("Done");
         }
     }
@@ -155,7 +155,6 @@ pub fn solver_layer(
         let nodes_to_insert = Mutex::new(Vec::new());
         if target_layer == 0 {
             children_to_evaluate
-                .clone()
                 .unwrap()
                 .par_iter()
                 .for_each(|child| {
@@ -176,7 +175,6 @@ pub fn solver_layer(
                 });
         } else {
             children_to_evaluate
-                .clone()
                 .unwrap()
                 .iter()
                 .for_each(|child| {

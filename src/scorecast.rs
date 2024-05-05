@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use itertools::Itertools;
+
 use parking_lot::RwLock;
 
 use crate::{
@@ -56,59 +56,11 @@ pub struct Scorecast {
 }
 
 impl Scorecast {
-    fn sum_to_n_k_terms_helper(
-        n: usize,
-        k: usize,
-        start: usize,
-        current: &mut Vec<usize>,
-        results: &mut Vec<Vec<usize>>,
-    ) {
-        if k == 0 && n == 0 {
-            results.push(current.clone());
-            return;
-        }
-        if k == 0 || n <= 0 {
-            return;
-        }
-        for i in start..=n {
-            current.push(i);
-            Self::sum_to_n_k_terms_helper(n - i, k - 1, i, current, results);
-            current.pop();
-        }
-    }
-    fn get_possible_key_lengths(n: usize, k: usize, max: usize) -> Vec<usize> {
-        let mut sums: Vec<Vec<usize>> = vec![];
-        let mut current: Vec<usize> = vec![];
-        Self::sum_to_n_k_terms_helper(n, k, 1, &mut current, &mut sums);
-        sums.iter()
-            .map(|sum| {
-                let mut clone = sum.clone();
-                clone.reverse();
-                clone
-            })
-            .map(|sum| sum[0])
-            .sorted()
-            .filter(|value| *value > 1)
-            .filter(|value| *value <= max)
-            .collect()
-    }
     pub fn get_scorecast_add(&self, path: &[Set32]) {
         let mut num_letters_path = Vec::new();
         for key in path {
             num_letters_path.push(key.ones_indices().len());
         }   
-    }
-    pub fn create_scorecast(
-        root: NodeIterator,
-        tree_height: usize,
-        target_height: usize,
-        target_num_keys: usize,
-        num_letters: usize,
-        max_key_len: usize,
-    ) -> Scorecast {
-        let scorecast: Scorecast = Scorecast::default();
-        // scorecast = Self::setup_scorecast_tree(scorecast, &[], root, target_num_keys, num_letters);
-        scorecast
     }
     fn calculate_scorecast_score(parent: &NodeIterator, child: &NodeIterator) -> f32 {
         //Wrong: INT(ABC) + INT(AB) + INT(AC) + INT(AD) = S(ABCD) - S(A) - S(B) - S(C) - S(D)
@@ -141,54 +93,6 @@ impl Scorecast {
         let node_score_parent = parent.current_node.read().score;
         return node_score_child - node_score_parent;
     }
-
-    fn set_child_sums_helper2(
-        scorecast: &Scorecast,
-        root: Arc<RwLock<ScorecastNode>>,
-        current: Arc<RwLock<ScorecastNode>>,
-        remaining_num_letters: usize,
-        remaining_num_keys: usize,
-        best_scores_for: &mut HashMap<(usize, usize), f32>, // num keys, num letters
-    ) {
-        if remaining_num_keys > remaining_num_letters {
-            current.write().child_sum = f32::MAX;
-            return;
-        }
-        if remaining_num_keys == remaining_num_letters {
-            current.write().child_sum = 0.0;
-            return;
-        }
-        let current_children = current.read().children.clone();
-        let mut child_sum: f32 = f32::MAX;
-        for child in current_children {
-            let child_letters = child.read().num_letters;
-            if child.read().num_letters <= remaining_num_letters {
-                let mut find = best_scores_for
-                    .get(&(remaining_num_keys, remaining_num_letters))
-                    .cloned();
-                if find.is_none() {
-                    find = Self::dfs_min_score(
-                        root.clone(),
-                        remaining_num_keys,
-                        remaining_num_letters,
-                    );
-                    best_scores_for
-                        .insert((remaining_num_keys, remaining_num_letters), find.unwrap());
-                }
-                child_sum = child_sum.min(find.unwrap());
-                Self::set_child_sums_helper(
-                    scorecast,
-                    root.clone(),
-                    child.clone(),
-                    remaining_num_letters - child_letters,
-                    remaining_num_keys - 1,
-                    best_scores_for,
-                );
-            }
-        }
-        current.write().child_sum = child_sum;
-    }
-
     // TODO, use f64's everywhere to keep precision, save as f32 at end
     fn set_child_sums_helper(
         scorecast: &Scorecast,
@@ -560,7 +464,7 @@ mod tests {
 
     use crate::{
         create_set32_str,
-        globals::{CHAR_TO_INDEX, NUM_LETTERS},
+        globals::CHAR_TO_INDEX,
         node::Node,
         node_iterator::NodeIterator,
         set32::Set32,
@@ -595,13 +499,13 @@ mod tests {
 
     #[test]
     fn empty_score_cast(){
-        let mut scorecast = Scorecast::default();
+        let scorecast = Scorecast::default();
         let add = scorecast.get_add_amount(10, 11);
         assert!(add.is_none());
     }
     #[test]
     fn scorecast_set_child_sums_complex(){
-        let mut iter = create_empty_node_iterator();
+        let iter = create_empty_node_iterator();
         let ab = Node::new(0.1, create_set32_str!("ab"), vec![]);
         let bc = Node::new(0.2, create_set32_str!("bc"), vec![]);
         let df = Node::new(0.23, create_set32_str!("df"), vec![]);
@@ -635,7 +539,7 @@ mod tests {
 
     #[test]
     fn scorecast_set_child_sums() {
-        let mut iter = create_empty_node_iterator();
+        let iter = create_empty_node_iterator();
         let ab = Node::new(0.1, create_set32_str!("ab"), vec![]);
         let xyz_ab = Node::new(0.4, create_set32_str!("ab"), vec![]);
         let xyz = Node::new(0.25, create_set32_str!("xyz"), vec![]);
@@ -698,7 +602,7 @@ mod tests {
     }
     #[test]
     fn scorecast_setup_tree() {
-        let mut iter = create_empty_node_iterator();
+        let iter = create_empty_node_iterator();
         let ab = Node::new(0.1, create_set32_str!("ab"), vec![]);
         let xyz_ab = Node::new(0.4, create_set32_str!("ab"), vec![]);
         let xyz = Node::new(0.2, create_set32_str!("xyz"), vec![]);
@@ -736,30 +640,6 @@ mod tests {
         assert!(letters5.is_some());
         assert_eq!(letters5.unwrap(), 1.5);
     }
-
-    #[test]
-    fn scorecast_sum_to_n_k_terms() {
-        let n = 27;
-        let k = 10;
-        let mut results = Vec::new();
-        let mut current = Vec::new();
-
-        Scorecast::sum_to_n_k_terms_helper(n, k, 1, &mut current, &mut results);
-        let len = results.len();
-        for result in results {
-            println!("{:?}", result.into_iter().rev().collect::<Vec<usize>>());
-        }
-        println!("{}", len);
-    }
-
-    #[test]
-    fn scorecast_get_possible_key_lengths() {
-        // 3 2 1 and 2 2 2
-        let key_lengths = Scorecast::get_possible_key_lengths(6, 3, 3);
-        println!("{:?}", key_lengths);
-        assert_eq!(key_lengths.len(), 2);
-    }
-
     #[test]
     fn scorecast_insert_find_node() {
         let mut scorecast = get_simple_scorecast();
@@ -781,18 +661,5 @@ mod tests {
         let find = scorecast.find_node(&[2, 2]);
         assert!(find.is_some());
         assert_eq!(find.unwrap().read().score, 1000.0);
-    }
-    #[test]
-    fn scorecast_create_scorecast_helper() {
-        let mut iter = create_empty_node_iterator();
-        let ab = Node {
-            children: vec![],
-            letters: create_set32_str!("ab"),
-            score: 0.15,
-        };
-        iter.insert_node_from_root(&[], ab);
-        let scorecast = Scorecast::create_scorecast(iter, 1, 0, 10, NUM_LETTERS, 5);
-        let scorecast_children = &scorecast.root.read().children;
-        assert_eq!(scorecast_children.len(), 0);
     }
 }
