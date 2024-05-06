@@ -69,7 +69,12 @@ fn solver_layer_evaluation_logic(
     let mut rng = rand::thread_rng();
     let random_number: u32 = rng.gen();
     // println!("Random number: {}", random_number);
-    let should_print = random_number < 429496; // about .001%
+    let should_print = random_number < 4294960; // about .01%
+    if should_print {
+        let mut fp = iter.path.clone();
+        fp.push(*child);
+        println!("Evaluating {}", set32s_to_string(&fp));
+    }
     if true {
         let start: Instant = Instant::now();
         let heuristic_evaluate = heuristic_evaluate(&iter, &new_path);
