@@ -43,9 +43,9 @@ pub fn solver(threshold: f32, desired_num_keys: usize, max_key_len: usize) {
         let start = Instant::now();
         scorecast.write().setup_scorecast_tree(&iter);
         println!("Scorecast tree created in {:?}", start.elapsed());
-        if i == 0 {
-            panic!("Done");
-        }
+        // if i == 0 {
+        //     panic!("Done");
+        // }
     }
 }
 
