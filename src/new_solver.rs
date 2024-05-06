@@ -63,9 +63,9 @@ fn solver_layer_evaluation_logic(
     let mut new_path = iter.path.clone();
     new_path.push(*child);
     println!("Evaluating {}", set32s_to_string(&new_path));
-    let mut add = None;
+    let add = Some(0.01 - target_layer as f32 *0.001);
     let mut heuristic_score = 0.0;
-    if target_layer != 0 {
+    if true {
         let start: Instant = Instant::now();
         let heuristic_evaluate = heuristic_evaluate(&iter, &new_path);
         println!("\tHeuristic duration: {:?}", start.elapsed());
@@ -77,10 +77,10 @@ fn solver_layer_evaluation_logic(
         let mut under_threshold: bool = heuristic_score <= threshold;
         let num_letters_used: usize = new_path.iter().map(|key| key.ones_indices().len()).sum();
         let start: Instant = Instant::now();
-        add = scorecast.read().get_add_amount(
-            desired_num_keys - target_layer,
-            desired_num_letters - num_letters_used,
-        );
+        // add = scorecast.read().get_add_amount(
+        //     desired_num_keys - target_layer,
+        //     desired_num_letters - num_letters_used,
+        // );
         println!("\tGetting add_amount took {:?}", start.elapsed());
         if add.is_none() {
             println!(
@@ -110,7 +110,7 @@ fn solver_layer_evaluation_logic(
         println!("\tSolution found: {}", set32s_to_string(&iter.path));
         panic!(
             "\tReal score: {}",
-            new_evaluate(&freq_list, &new_path, threshold).0
+            new_evaluate(&freq_list, &new_path, threshold - add.unwrap()).0
         );
     }
 
