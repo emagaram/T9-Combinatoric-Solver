@@ -4,6 +4,7 @@ use std::{
 };
 
 use parking_lot::RwLock;
+use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
@@ -63,12 +64,19 @@ fn solver_layer_evaluation_logic(
     let mut new_path = iter.path.clone();
     new_path.push(*child);
     println!("Evaluating {}", set32s_to_string(&new_path));
-    let add = Some(0.01 - target_layer as f32 *0.001);
+    let add = Some(0.01 - ((1.0 + target_layer as f32) *0.001));
     let mut heuristic_score = 0.0;
+    let mut rng = rand::thread_rng();
+    let random_number: u32 = rng.gen();
+    println!("Random number: {}", random_number);
+    let should_print = random_number < 429496; // about .001%
     if true {
         let start: Instant = Instant::now();
         let heuristic_evaluate = heuristic_evaluate(&iter, &new_path);
-        println!("\tHeuristic duration: {:?}", start.elapsed());
+        if should_print {
+            println!("\tHeuristic duration: {:?}", start.elapsed());
+        }
+        
         if heuristic_evaluate.is_none() {
             println!("\tHeuristic failed.");
             return None;
@@ -81,23 +89,37 @@ fn solver_layer_evaluation_logic(
         //     desired_num_keys - target_layer,
         //     desired_num_letters - num_letters_used,
         // );
-        println!("\tGetting add_amount took {:?}", start.elapsed());
+        if should_print {
+            println!("\tGetting add_amount took {:?}", start.elapsed());
+        }
+        
         if add.is_none() {
-            println!(
-                "\tScorecasting predicted failure for {}. This probably shouldn't happen",
-                set32s_to_string(&new_path)
-            );
+            if should_print {
+                println!(
+                    "\tScorecasting predicted failure for {}. This probably shouldn't happen",
+                    set32s_to_string(&new_path)
+                );
+            }
+
         } else {
-            println!(
-                "\tHeuristic w/o scorecasting: {}, w/ scorecasting {}",
-                heuristic_score,
-                heuristic_score + add.unwrap()
-            );
+            if should_print {
+                println!(
+                    "\tHeuristic w/o scorecasting: {}, w/ scorecasting {}",
+                    heuristic_score,
+                    heuristic_score + add.unwrap()
+                );
+            }
             under_threshold = heuristic_score + add.unwrap() <= threshold;
         }
-        println!("\tHeuristic score under threshold: {}", under_threshold);
+        if should_print {
+            println!("\tHeuristic score under threshold: {}", under_threshold);
+        }
+        
         if !under_threshold {
-            println!("\tPruning!");
+            if should_print {
+                println!("\tPruning!");
+            }
+            
             // should_continue = false;
             return None;
         }
@@ -116,14 +138,17 @@ fn solver_layer_evaluation_logic(
 
     let real_score_with_scorecast = real_score + add.unwrap_or(0.0);
     let under_threshold = real_score_with_scorecast <= threshold;
-    println!(
-        "\tReal score w/o scorecast: {}, with scorecast {}, under threshold: {}",
-        real_score, real_score_with_scorecast, under_threshold
-    );
-    println!(
-        "\tHeuristic percentage error: %{}",
-        100.0 * (heuristic_score - real_score).abs() / ((heuristic_score + real_score) / 2.0)
-    );
+    if should_print {
+        println!(
+            "\tReal score w/o scorecast: {}, with scorecast {}, under threshold: {}",
+            real_score, real_score_with_scorecast, under_threshold
+        );
+        println!(
+            "\tHeuristic percentage error: %{}",
+            100.0 * (heuristic_score - real_score).abs() / ((heuristic_score + real_score) / 2.0)
+        );
+    }
+
 
     if under_threshold {
         let node = Node::new(real_score, *child, vec![]);
@@ -131,7 +156,10 @@ fn solver_layer_evaluation_logic(
         // iter.insert_node_from_here(node);
         // nodes_to_insert.push(node);
     } else {
-        println!("\tPruning!");
+        if should_print {
+            println!("\tPruning!");
+        }
+        
         return None;
     }
 }
