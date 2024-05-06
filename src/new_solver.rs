@@ -104,13 +104,13 @@ fn solver_layer_evaluation_logic(
     }
 
     let start: Instant = Instant::now();
-    let real_score = new_evaluate(&freq_list, &new_path, threshold).0;
+    let (real_score, num_keys) = new_evaluate(&freq_list, &new_path, threshold- add.unwrap());
     println!("\tReal evaluate duration: {:?}", start.elapsed());
-    if iter.path.len() == max_key_len && real_score <= threshold {
+    if num_keys == max_key_len && real_score <= threshold {
         println!("\tSolution found: {}", set32s_to_string(&iter.path));
         panic!(
             "\tReal score: {}",
-            new_evaluate(&freq_list, &new_path, threshold - add.unwrap()).0
+            new_evaluate(&freq_list, &new_path, threshold).0
         );
     }
 
