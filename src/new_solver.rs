@@ -63,12 +63,12 @@ fn solver_layer_evaluation_logic(
 ) -> Option<Node> {
     let mut new_path = iter.path.clone();
     new_path.push(*child);
-    println!("Evaluating {}", set32s_to_string(&new_path));
+    // println!("Evaluating {}", set32s_to_string(&new_path));
     let add = Some(0.01 - ((1.0 + target_layer as f32) *0.001));
     let mut heuristic_score = 0.0;
     let mut rng = rand::thread_rng();
     let random_number: u32 = rng.gen();
-    println!("Random number: {}", random_number);
+    // println!("Random number: {}", random_number);
     let should_print = random_number < 429496; // about .001%
     if true {
         let start: Instant = Instant::now();
@@ -127,7 +127,9 @@ fn solver_layer_evaluation_logic(
 
     let start: Instant = Instant::now();
     let (real_score, num_keys) = new_evaluate(&freq_list, &new_path, threshold- add.unwrap());
-    println!("\tReal evaluate duration: {:?}", start.elapsed());
+    if should_print {
+        println!("\tReal evaluate duration: {:?}", start.elapsed());
+    }
     if num_keys == max_key_len && real_score <= threshold {
         println!("\tSolution found: {}", set32s_to_string(&iter.path));
         panic!(
