@@ -31,6 +31,8 @@ pub fn create_freq_list(dict_path: &str) -> FreqList {
 
 #[cfg(test)]
 mod tests {
+    use hashbrown::HashMap;
+
     use super::create_freq_list;
     #[test]
     fn freq_list_has_right_num_bytes() {
@@ -46,5 +48,26 @@ mod tests {
         assert_eq!(list1[1000].0, list2[1000].0);
         assert_eq!(list1[5000].0, list2[5000].0);
         assert_eq!(list1[50000].0, list2[50000].0);
+    }
+    #[test]
+    fn count_num_word_len() {
+        let list1 = create_freq_list("./word_freq.json");
+        let mut len_track: HashMap<usize, usize> = HashMap::new();
+        for word in list1 {
+            len_track
+                .entry(word.0.len())
+                .and_modify(|value| *value += 1)
+                .or_insert(1);
+        }
+        let mut total = 0;
+        for key in 1..50 as usize {
+            if !len_track.contains_key(&key){
+                continue;
+            }
+            let np = len_track[&key]*(len_track[&key]-1)/2;
+            total+=np;
+            println!("Len: {}, Num {}, num pairs: {}", key, len_track[&key], np);
+        }
+        println!("Total {}", total);
     }
 }
