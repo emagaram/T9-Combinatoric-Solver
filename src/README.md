@@ -1,0 +1,3 @@
+# T9 Keyboard Optimizer
+
+A dynamic programming approach to optimizing the T9 keyboard with the ultimate goal of creating a laptop/desktop keyboard layout that uses only 14 keys. Written in Rust. Lot more details coming later...
