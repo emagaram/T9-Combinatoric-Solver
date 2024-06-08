@@ -7,6 +7,19 @@ use parking_lot::RwLock;
 use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+/*
+New plan: 
+    - Find minimum scoring key config that uses less letters and just use that as a scorecast. It should only take a few seconds.
+        - Can also look at 18,1 and 17,2/16,3 and 16,2/15,3 to see if you can increase the number of letters safely.
+    - Create a list of all word pairs and iterate through them, adding their frequency to the node. Also keep a separate hashmap 
+      and count of seen words so that you don't repeat them more than 4x. E.g. for at + so, it + so, to+so, as+so astoi => "so" could be moved back very far
+        - Use the same tree for storing these scores as your actual scoring tree. Store an "intersect" score and a "full" score.
+     
+
+
+*/
+
+
 use crate::{
     evaluate::new_evaluate,
     freq_list::{create_freq_list, FreqList},
